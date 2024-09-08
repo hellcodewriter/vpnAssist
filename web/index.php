@@ -1,8 +1,9 @@
 <?php
-
 $cfg = require_once __DIR__.'/../cfg.php';
 
 if(strpos($_SERVER['REQUEST_URI'], 'new')){
+	
+	shell_exec("chmod +x ".APP_DIR.'/new-client.sh');
 	
 	for($i=0; $i<10; $i++){
 		$clientName = 'client'.rand(10000, 10000000);
@@ -17,8 +18,6 @@ if(strpos($_SERVER['REQUEST_URI'], 'new')){
 	
 	if(!mkdir($clientDir))
 		die('error2');
-	
-	
 	
 	$response = shell_exec("{$cfg['addCommand']} {$clientName} {$clientDir}");
 	

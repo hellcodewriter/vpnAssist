@@ -2,6 +2,7 @@
 set_time_limit(0);
 date_default_timezone_set("Europe/Moscow");
 error_reporting(E_ALL);
+define('APP_DIR', __DIR__);
 
 return [
 	'host'=>'0.0.0.0',
