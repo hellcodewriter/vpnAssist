@@ -136,9 +136,11 @@ function generateClientIp($cfg){
 		return null;
 	}
 	
-	if(!$clientIp)
+	if(!$clientIp){
 		echo "client ip not generated\n";
-	else
-		return $clientIp;
+		return false;
+	}
+	
+	return $clientIp;
 }
 
