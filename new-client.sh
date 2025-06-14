@@ -236,8 +236,8 @@ PrivateKey = ${SERVER_PRIV_KEY}" >"/etc/wireguard/${SERVER_WG_NIC}.conf"
 	if pgrep firewalld; then
 		FIREWALLD_IPV4_ADDRESS=$(echo "${SERVER_WG_IPV4}" | cut -d"." -f1-3)".0"
 		FIREWALLD_IPV6_ADDRESS=$(echo "${SERVER_WG_IPV6}" | sed 's/:[^:]*$/:0/')
-		echo "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'
-PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'" >>"/etc/wireguard/${SERVER_WG_NIC}.conf"
+		echo "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/23 masquerade' && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/23 masquerade'
+PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/23 masquerade' && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/23 masquerade'" >>"/etc/wireguard/${SERVER_WG_NIC}.conf"
 	else
 		echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_WG_NIC} -j ACCEPT
@@ -282,6 +282,8 @@ net.ipv6.conf.all.forwarding = 1" >/etc/sysctl.d/wg.conf
 }
 
 function newClient() {
+  CLIENT_WG_IPV4="$3"
+
 	# If SERVER_PUB_IP is IPv6, add brackets if missing
 	if [[ ${SERVER_PUB_IP} =~ .*:.* ]]; then
 		if [[ ${SERVER_PUB_IP} != *"["* ]] || [[ ${SERVER_PUB_IP} != *"]"* ]]; then
@@ -302,46 +304,24 @@ function newClient() {
     exit
   fi
 
+  echo "client ip : ${CLIENT_WG_IPV4}\n";
 
-
-    IFS='.' read -r o1 o2 o3 o4 <<< "$SERVER_WG_IPV4"
-    base3=$(( o3 & 254 ))
-
-    # Ищем свободный хост-номер от 2 до 510
-    for host in $(seq 2 510); do
-        third=$(( base3 + host / 256 ))
-        fourth=$(( host % 256 ))
-        candidate="${o1}.${o2}.${third}.${fourth}"
-        if ! grep -q "${candidate}" "/etc/wireguard/${SERVER_WG_NIC}.conf"; then
-            CLIENT_WG_IPV4="$candidate"
-            break
-        fi
-    done
-
-
-	CLIENT_WG_IPV4="${BASE_IP}.${DOT_IP}"
-  IPV4_EXISTS=$(grep -c "$CLIENT_WG_IPV4/32" "/etc/wireguard/${SERVER_WG_NIC}.conf")
+  IPV4_EXISTS=$(grep -c "${CLIENT_WG_IPV4}/32" "/etc/wireguard/${SERVER_WG_NIC}.conf")
 
   if [[ ${IPV4_EXISTS} != 0 ]]; then
     echo ""
     echo -e "${ORANGE}A client with the specified IPv4 was already created, please choose another IPv4.${NC}"
     echo ""
+    exit
   fi
+
+
 
 	BASE_IP=$(echo "$SERVER_WG_IPV6" | awk -F '::' '{ print $1 }')
 
-	CLIENT_WG_IPV6="${BASE_IP}::${DOT_IP}"
-  IPV6_EXISTS=$(grep -c "${CLIENT_WG_IPV6}/128" "/etc/wireguard/${SERVER_WG_NIC}.conf")
-
-  if [[ ${IPV6_EXISTS} != 0 ]]; then
-    echo ""
-    echo -e "${ORANGE}A client with the specified IPv6 was already created, please choose another IPv6.${NC}"
-  	echo ""
-  fi
 
   echo -e "${CLIENT_NAME}\n";
   echo -e "${CLIENT_WG_IPV4}\n";
-  echo -e "${CLIENT_WG_IPV6}\n";
 
 
 	# Generate key pair for the client
@@ -354,7 +334,7 @@ function newClient() {
 	# Create client file and add the server as a peer
 	echo "[Interface]
 PrivateKey = ${CLIENT_PRIV_KEY}
-Address = ${CLIENT_WG_IPV4}/32,${CLIENT_WG_IPV6}/128
+Address = ${CLIENT_WG_IPV4}/32
 DNS = ${CLIENT_DNS_1},${CLIENT_DNS_2}
 
 [Peer]
@@ -368,7 +348,7 @@ AllowedIPs = ${ALLOWED_IPS}" >"${HOME_DIR}/${SERVER_WG_NIC}-client-${CLIENT_NAME
 [Peer]
 PublicKey = ${CLIENT_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
-AllowedIPs = ${CLIENT_WG_IPV4}/32,${CLIENT_WG_IPV6}/128" >>"/etc/wireguard/${SERVER_WG_NIC}.conf"
+AllowedIPs = ${CLIENT_WG_IPV4}/32" >>"/etc/wireguard/${SERVER_WG_NIC}.conf"
 
 	wg syncconf "${SERVER_WG_NIC}" <(wg-quick strip "${SERVER_WG_NIC}")
 
@@ -518,7 +498,7 @@ function manageMenu() {
 
 if [[ -e /etc/wireguard/params ]]; then
 	source /etc/wireguard/params
-	newClient $1 $2
+	newClient $1 $2 $3
 else
 	exit
 fi

@@ -10,6 +10,7 @@ return [
 	'addCommand' => __DIR__.'/new-client.sh',
 	'clientsDir' => __DIR__.'/clients',
 	'runtimeDir' => __DIR__.'/web/runtime',
+	'wgConfigFile' => '/etc/wireguard/wg0.conf',
 ];
 
 

@@ -19,7 +19,15 @@ if(strpos($_SERVER['REQUEST_URI'], 'new')){
 	if(!mkdir($clientDir))
 		die('error2');
 	
-	$response = shell_exec("{$cfg['addCommand']} {$clientName} {$clientDir}");
+	if(!$clientIp = generateClientIp($cfg))
+		die('error clientIp');
+	
+	$command  = "{$cfg['addCommand']} {$clientName} {$clientDir} {$clientIp}";
+	
+	//debug
+	//die($command);
+	
+	$response = shell_exec($command);
 	
 	if(strpos($response, '!success!')!==false){
 
@@ -85,5 +93,52 @@ function zipDir($dir, $zipFilePath){
 	$zip->close();
 	
 	return file_exists($zipFilePath);
+}
+
+function generateClientIp($cfg){
+	if(!$cfg['wgConfigFile'] or !file_exists($cfg['wgConfigFile'])){
+		echo "no wg cfg file\n";
+		return null;
+	}
+	
+	if(!$content = file_get_contents($cfg['wgConfigFile'])){
+		echo "empty wg cfg file\n";
+		return null;
+	}
+	
+	if(!preg_match('!\[Interface\]\s+Address \= (\d+)\.(\d+)\.(\d+)\.(\d+)/(\d+)!is', $content, $matches)){
+		echo "cant find interface ip\n";
+		return null;
+	}
+	
+	$clientIp = '';
+	
+	if($matches[5] == '24'){
+		for($sub24 = 2; $sub24 <= 254; $sub24++){
+			$clientIp = "{$matches[1]}.{$matches[2]}.{$matches[3]}.{$sub24}";
+			
+			if(!str_contains($content, "AllowedIPs = {$clientIp}/32"))
+				break;
+		}
+	}elseif($matches[5] == '23'){
+		//10.66.66.1/23
+		//10.66.66.2-254 - 10.66.67.2-254
+		for($sub23 = $matches[3]; $sub23 <= intval($matches[3])+1; $sub23++){
+			for($sub24 = 2; $sub24 <= 254; $sub24++){
+				$clientIp = "{$matches[1]}.{$matches[2]}.{$sub23}.{$sub24}";
+				
+				if(!str_contains($content, "AllowedIPs = {$clientIp}/32"))
+					break;
+			}
+		}
+	}else{
+		echo "error subnet parse\n";
+		return null;
+	}
+	
+	if(!$clientIp)
+		echo "client ip not generated\n";
+	else
+		return $clientIp;
 }
 
