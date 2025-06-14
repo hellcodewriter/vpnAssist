@@ -128,7 +128,7 @@ function generateClientIp($cfg){
 				$clientIp = "{$matches[1]}.{$matches[2]}.{$sub23}.{$sub24}";
 				
 				if(!str_contains($content, "AllowedIPs = {$clientIp}/32"))
-					break;
+					break 2;
 			}
 		}
 	}else{
