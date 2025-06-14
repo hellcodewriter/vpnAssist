@@ -229,7 +229,7 @@ ALLOWED_IPS=${ALLOWED_IPS}" >/etc/wireguard/params
 
 	# Add server interface
 	echo "[Interface]
-Address = ${SERVER_WG_IPV4}/24,${SERVER_WG_IPV6}/64
+Address = ${SERVER_WG_IPV4}/23,${SERVER_WG_IPV6}/64
 ListenPort = ${SERVER_PORT}
 PrivateKey = ${SERVER_PRIV_KEY}" >"/etc/wireguard/${SERVER_WG_NIC}.conf"
 
@@ -303,21 +303,20 @@ function newClient() {
   fi
 
 
-	for DOT_IP in {2..254}; do
-		DOT_EXISTS=$(grep -c "${SERVER_WG_IPV4::-1}${DOT_IP}" "/etc/wireguard/${SERVER_WG_NIC}.conf")
-		if [[ ${DOT_EXISTS} == '0' ]]; then
-			break
-		fi
-	done
 
-	if [[ ${DOT_EXISTS} == '1' ]]; then
-		echo ""
-		echo "The subnet configured supports only 253 clients."
-		exit 1
-	fi
+    IFS='.' read -r o1 o2 o3 o4 <<< "$SERVER_WG_IPV4"
+    base3=$(( o3 & 254 ))
 
-	BASE_IP=$(echo "$SERVER_WG_IPV4" | awk -F '.' '{ print $1"."$2"."$3 }')
-	echo "${BASE_IP}"
+    # Ищем свободный хост-номер от 2 до 510
+    for host in $(seq 2 510); do
+        third=$(( base3 + host / 256 ))
+        fourth=$(( host % 256 ))
+        candidate="${o1}.${o2}.${third}.${fourth}"
+        if ! grep -q "${candidate}" "/etc/wireguard/${SERVER_WG_NIC}.conf"; then
+            CLIENT_WG_IPV4="$candidate"
+            break
+        fi
+    done
 
 
 	CLIENT_WG_IPV4="${BASE_IP}.${DOT_IP}"

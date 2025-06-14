@@ -22,7 +22,7 @@ if(strpos($_SERVER['REQUEST_URI'], 'new')){
 	$response = shell_exec("{$cfg['addCommand']} {$clientName} {$clientDir}");
 	
 	if(strpos($response, '!success!')!==false){
-		
+
 		//downloadFile();
 		//echo "success for {$clientName}<br>";
 		$zipFile = $cfg['runtimeDir'].'/clientCfg.zip';
