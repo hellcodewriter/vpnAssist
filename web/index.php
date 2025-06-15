@@ -138,7 +138,7 @@ function generateClientIp($cfg){
 	
 	if(!$clientIp){
 		echo "client ip not generated\n";
-		return false;
+		return null;
 	}
 	
 	return $clientIp;
