@@ -1,4 +1,11 @@
 <?php
+//generate api pass
+$cfgPath = __DIR__.'/../cfg.php';
+$cfgContent = file_get_contents($cfgPath);
+$pass = generatePass(rand(20, 32));
+$cfgContent = str_replace("'vpnApiPass' => ''", "'vpnApiPass' => '{$pass}'", trim($cfgContent));
+file_put_contents($cfgPath, $cfgContent);
+
 $cfg = require_once __DIR__.'/../cfg.php';
 
 if(strpos($_SERVER['REQUEST_URI'], 'new')){
@@ -44,8 +51,56 @@ if(strpos($_SERVER['REQUEST_URI'], 'new')){
 		die('error5');
 	
 	
+}elseif(str_contains($_SERVER['REQUEST_URI'], '/removeClient') or str_contains($_SERVER['REQUEST_URI'], '/findClient')) {
+	
+	if(empty($_GET['id']))
+		returnJson(['error'=>'no clientId']);
+	
+	if(empty($cfg['vpnApiPass']))
+		returnJson(['error'=>'no vpnApiPass configured']);
+	
+	if(empty($_GET['pass']))
+		returnJson(['error'=>'your pass is empty']);
+	
+	if($_GET['pass'] !== $cfg['vpnApiPass'])
+		returnJson(['error'=>'wrong Pass']);
+	
+	$wgCfgContent = @file_get_contents(WG_CFG_PATH);
+	
+	if(!$wgCfgContent)
+		returnJson(['error'=>'wg cfg not found']);
+	
+	$clientId = $_GET['id'];
+	
+	if(!str_contains($wgCfgContent, "### Client {$clientId}"))
+		returnJson(['error'=>'client not found']);
+	
+	if(str_contains($_SERVER['REQUEST_URI'], '/findClient'))
+		returnJson(['result'=>'OK']);
+	
+	$wgContent = preg_replace('!### Client '.$clientId.'\s+\[Peer\]\s+PublicKey \= .+?PresharedKey \= .+?AllowedIPs = [\d\.\,/:\w]+!is', '', $wgCfgContent);
+	
+	if(str_contains($wgContent, '### Client '.$clientId))
+		returnJson(['error'=>'client not removed']);
+	
+	if(file_put_contents(WG_CFG_PATH, $wgContent) === false)
+		returnJson(['error'=>'error cfg file save']);
+	
+	$execResult = shell_exec("wg-quick down wg0;wg-quick up wg0 2>&1");
+	
+	if(!str_contains($execResult, 'ip link add wg0 type wireguard'))
+		returnJson(['error'=>'error vpn restart'.$execResult]);
+	
+	returnJson(['result'=>'OK']);
+	
 }else{
 	die('');
+}
+
+function returnJson(array $data){
+	header('Content-Type: application/json');
+	echo json_encode($data);
+	die;
 }
 
 
@@ -144,3 +199,15 @@ function generateClientIp($cfg){
 	return $clientIp;
 }
 
+function generatePass($length = 12) {
+	$characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+	$charactersLength = strlen($characters);
+	$password = '';
+	
+	for ($i = 0; $i < $length; $i++) {
+		$randomIndex = random_int(0, $charactersLength - 1);
+		$password .= $characters[$randomIndex];
+	}
+	
+	return $password;
+}
